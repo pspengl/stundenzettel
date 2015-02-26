@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 #The MIT License (MIT)
 #
 #Copyright (c) <2015> <Patrick Spengler>
@@ -24,30 +26,28 @@ import random
 import calendar
 import collections
 import datetime
+import math
 
 
 def getInt(inputstr,errorstr,low,high):
-    b = True
-    valueErr = False
-    while b:
+    while True:
         try:
-            tmpInput = int(input(inputstr))    
+            tmpInput = int(raw_input(inputstr))    
         except ValueError:
-            valueErr = True
-        if valueErr:
             print(errorstr)
+            continue
+        if tmpInput >= low and tmpInput <= high:
+            break
         else:
-            if tmpInput >= low and tmpInput <= high:
-                b = False
-            else:
-                print(errorstr)
-            
+            print(errorstr)
+
     return tmpInput
 
+# returns the name of the month
 def getMonth(month):
     if month == 1: return "Januar"
     elif month == 2: return "Februar"
-    elif month == 3: return "März"
+    elif month == 3: return r"M\"arz"
     elif month == 4: return "April"
     elif month == 5: return "Mai"
     elif month == 6: return "Juni"
@@ -58,6 +58,7 @@ def getMonth(month):
     elif month == 11: return "November"
     elif month == 12: return "Dezember"
 
+# returns the date of eastern sunday
 def eastern_greg(year):
     a = year%19
     b,c = divmod(year,100)
@@ -102,34 +103,41 @@ def isHolyday(date):
     return date in holyday
     
 
-def buildHoursList(date, hours):
+def buildHoursList(date, workHours):
 
     HoursTimeDay = collections.namedtuple("Hours",("day","time","hours"))
 
-    high = hours / 6 + 2
+    high = int(math.ceil(workHours / 6 + 2))
     
     maxday = calendar.monthrange(date.year,date.month)[1]
     daylist = list(range(1,maxday+1))
     hoursList = []
-    while hours > 0:
+    while workHours > 0:
         dayIndex = random.randrange(1,len(daylist))
         day = daylist.pop(dayIndex)
         weekday = calendar.weekday(date.year, date.month, day)
         if weekday < 5 and not isHolyday(datetime.date(date.year, date.month, day)):
             dayHours = random.randrange(1,high)
-            if dayHours > hours:
-                dayHours = hours
+            if dayHours > workHours:
+                dayHours = workHours
             timeStart = random.randrange(8, 19 - dayHours)
             timeEnd = timeStart + dayHours
-            hours = hours - dayHours
+            workHours = workHours - dayHours
             h = HoursTimeDay(day,str(timeStart)+r":00 - "+str(timeEnd)+r":00",dayHours)
             hoursList.append(h)
     hoursList.sort()
     return hoursList
 
+def vaccationTime(hours):
+
+    vacDay = math.ceil(hours - (hours * 0.929))
+    return vacDay
+
 def build(name, supervisor, project, work, date, hours):
     
-    hoursList = buildHoursList(date, hours)
+    vacHours = int(vaccationTime(hours))
+    workHours = hours - vacHours
+    hoursList = buildHoursList(date, workHours)
     maxday = calendar.monthrange(date.year,date.month)[1]
     
     f = open("stundenzettel.tex","a")
@@ -141,7 +149,7 @@ def build(name, supervisor, project, work, date, hours):
     f.write(r"\hline"+"\n")
     f.write(r"Name des Hiwis & "+name+r" & &\\"+"\n")
     f.write(r"\hline"+"\n")
-    f.write(r"h/m & " +str(hours)+ r"& & Projekt: "+project+r" \\"+"\n")
+    f.write(r"h/m & " +str(workHours)+ r"& & Projekt: "+project+r" \\"+"\n")
     f.write(r"\hline"+"\n")
     f.write(r"von & "+date.strftime("%d.%m.%Y")+r" & & \\"+"\n")
     f.write(r"\hline"+"\n")
@@ -150,7 +158,7 @@ def build(name, supervisor, project, work, date, hours):
     f.write(r"\hline"+"\n")
     f.write(r"& & & \\"+"\n")
     f.write(r"\hline"+"\n")
-    f.write(r"Urlaub-h & 0& & \\"+"\n")
+    f.write(r"Urlaub-h & " + str(vacHours) + r" & & \\"+"\n")
     f.write(r"\hline"+"\n")
     f.write(r"Tag: & Uhrzeit von-bis: & Std.: & " + r"T\"atigkeit:"
             + r" Stichwort oder Beschreibung\\"+"\n")
@@ -173,11 +181,11 @@ def build(name, supervisor, project, work, date, hours):
         f.write(r"\hline" + "\n")
         d = d + 1
     
-    f.write(r" & Urlaub & 0,0 & \\" + "\n")
+    f.write(r" & Urlaub & " + str(vacHours) + r"& \\" + "\n")
     f.write(r"\hline" + "\n")
-    f.write(r" & Arbeitsstunden & " + str(hours) + r",0 & \\" + "\n")
+    f.write(r" & Arbeitsstunden & " + str(workHours) + r" & \\" + "\n")
     f.write(r"\hline" + "\n")
-    f.write(r" & Konto lfd. Monat & 0,0 & \\" + "\n")
+    f.write(r" & Konto lfd. Monat & " + str(hours) + r" & \\" + "\n")
     f.write(r"\hline" + "\n")
     f.write(r"\end{tabularx}" + "\n")
     f.write(r"\end{table}" + "\n")
@@ -191,16 +199,16 @@ def build(name, supervisor, project, work, date, hours):
 def userinput():
 
     
-    name = input("Name? ")
-    project = input("Projekt? ")
-    work = input("Tätigkeit? ")
+    name = raw_input("Name(Hiwi)? ")
+    project = raw_input("Projekt? ")
+    work = raw_input("Tätigkeit? ")
     year1 = getInt("Jahr von ","Nur Zahlen von 1900-2100",1900,2100)
 
     year2 = getInt("Jahr bis ","Nur Zahlen von 1900-2100",1900,2100)
-    month1 = getInt("Monat bis ","Nur Zahlen von 1-12",1,12)
+    month1 = getInt("Monat von ","Nur Zahlen von 1-12",1,12)
     month2 = getInt("Monat bis ","Nur Zahlen von 1-12",1,12)
     hours = getInt("Stundenzahl? ","Nur positive Zahlen",0,200)
-    supervisor = input("Betreuer? ")
+    supervisor = raw_input("Betreuer? ")
 
     date1 = datetime.date(year1,month1,1)
     date2 = datetime.date(year2,month2,1)
